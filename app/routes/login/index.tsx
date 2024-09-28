@@ -1,8 +1,14 @@
-import { json, redirect, ActionFunctionArgs } from "@remix-run/node";
+import {
+  json,
+  redirect,
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+} from "@remix-run/node";
 import { Form, useActionData } from "@remix-run/react";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { prisma } from "~/utils/prisma.server";
+import { authCookie, requireAuthCookie } from "utils/auth";
+import { prisma } from "utils/prisma.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
@@ -18,15 +24,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ error: "Invalid email or password" }, { status: 400 });
   }
 
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
 
   // Set token in cookies
+  // return redirect("/", {
+  //   headers: {
+  //     "Set-Cookie": `token=${token}; HttpOnly; Path=/; Max-Age=3600`,
+  //   },
+  // });
+
   return redirect("/", {
     headers: {
-      "Set-Cookie": `token=${token}; HttpOnly; Path=/; Max-Age=3600`,
+      "Set-Cookie": await authCookie.serialize(user.id),
     },
   });
 };
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  let userId = await requireAuthCookie(request);
+  if (userId) {
+    throw redirect("/home");
+  }
+  return null;
+}
 
 export default function LoginPage() {
   const actionData = useActionData();
@@ -43,7 +65,9 @@ export default function LoginPage() {
           <label htmlFor="password">Password:</label>
           <input type="password" name="password" required />
         </div>
-        {actionData?.error && <p style={{ color: "red" }}>{actionData.error}</p>}
+        {actionData?.error && (
+          <p style={{ color: "red" }}>{actionData.error}</p>
+        )}
         <button type="submit">Login</button>
       </Form>
     </div>

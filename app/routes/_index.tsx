@@ -1,4 +1,9 @@
-import type { MetaFunction } from "@remix-run/node";
+import {
+  redirect,
+  type LoaderFunctionArgs,
+  type MetaFunction,
+} from "@remix-run/node";
+import { requireAuthCookie } from "utils/auth";
 
 export const meta: MetaFunction = () => {
   return [
@@ -6,6 +11,14 @@ export const meta: MetaFunction = () => {
     { name: "description", content: "Welcome to Remix!" },
   ];
 };
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  let userId = await requireAuthCookie(request);
+  if (userId) {
+    throw redirect("/home");
+  }
+  return null;
+}
 
 export default function Index() {
   return (
